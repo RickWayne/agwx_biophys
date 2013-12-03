@@ -65,7 +65,7 @@ module AgwxBiophys
       if ( avg_v_press > 0.5)
         0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) );
       else
-        (1 - 0.261*Math.exp(-0.000777*avg*avg))
+        (1 - 0.261 * Math.exp(-0.000777 * avg * avg))
       end
     end
     
