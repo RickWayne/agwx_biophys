@@ -1,9 +1,10 @@
 module AgwxBiophys
   module ET
-    SOLCON     = 1367.0
-    STEFAN     = (0.0864*0.0000000567)
-    SFCEMISS   = 0.96
-    ALBEDO     = 0.25
+    SOLCON    = 1367.0
+    STEFAN    = (0.0864*0.0000000567)
+    SFCEMISS  = 0.96
+    ALBEDO    = 0.25
+    KELVIN    = 273.15
     
     def rad_lat(lat); lat * Math::PI / 180.0;end
 
@@ -26,7 +27,6 @@ module AgwxBiophys
 
     def sunrise_hour(doy,lat); 12 - ( 12 / Math::PI ) * sunrise_angle(doy,lat); end
 
-    # Seems pretty triv; not writing a test for it
     def day_hours(doy,lat); 24 - 2 * sunrise_hour(doy,lat); end
 
     def av_eir(doy)
@@ -46,6 +46,29 @@ module AgwxBiophys
          Math.sin( sunrise_angle(doy,lat) )
       )
     end
+    
+    def c_to_k(temperature); temperature + KELVIN; end
+
+    # Remember, temps in kelvin!
+    def lwu(min_temp,max_temp)
+      avg = (min_temp+max_temp) / 2.0
+      SFCEMISS * STEFAN * (273.15+avg) ** 4
+    end
+    
+    def sfactor(min_temp,max_temp)
+      avg = (min_temp+max_temp) / 2.0
+      0.398 + 0.0171 * avg - 0.000142 * avg * avg
+    end
+    
+    def sky_emiss(avg_v_press,min_temp,max_temp)
+      avg_temp = (min_temp+max_temp) / 2.0
+      if ( avg_v_press > 0.5)
+        0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) );
+      else
+        (1 - 0.261*Math.exp(-0.000777*avg*avg))
+      end
+    end
+    
     # Here's the old Java code
     # double rad_lat =       lat *Math.PI/180.0;
     # double DailyToSol =    0.0864 * DToSol;

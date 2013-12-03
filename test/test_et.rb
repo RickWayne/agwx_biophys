@@ -61,7 +61,17 @@ class TestET < Test::Unit::TestCase
       assert_in_delta(sun_hour, sunrise_hour(doy,latitude), 0.00001)
     end
   end
-  
+
+  def test_day_hours
+    [
+      [1,0,12.0],
+      [150,30,13.7826561727],
+      [172,45,15.4349187028],
+      [200,60,17.491013458]
+    ].each do |doy,latitude,day_hrs|
+      assert_in_delta(day_hrs, day_hours(doy,latitude), 0.0001)
+    end
+  end
   def test_av_eir
     [
       [1,1414.8379112589],
@@ -82,7 +92,26 @@ class TestET < Test::Unit::TestCase
     ].each do |doy,latitude,total_eir|
       assert_in_delta(total_eir, to_eir(doy,latitude), 0.001)
     end
-    
+  end
+  
+  def test_lwu
+    [
+      [273.15,293.15,450.406110886],
+      [268.15,308.15,466.818655323],
+      [293.15,313.15,518.7552592804]
+    ].each do |min,max,exp_lwu|
+      assert_in_delta(exp_lwu, lwu(min,max), 2 ** -20)
+    end
+  end
+  
+  def test_sfactor
+    [
+      [273.15,293.15,-6.144831995],
+      [268.15,308.15,-6.464954995],
+      [293.15,313.15,-7.467923995]
+    ].each do |min,max,exp_sfactor|
+      assert_in_delta(exp_sfactor, sfactor(min,max), 2 ** -20)
+    end
   end
     
 end
