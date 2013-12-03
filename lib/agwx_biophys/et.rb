@@ -47,9 +47,14 @@ module AgwxBiophys
       )
     end
     
+    # FIXME: Write test
+    def to_clr(doy,lat)
+      to_eir(doy,lat) * (-.7 + 0.86*day_hours(doy,lat)) / day_hours(doy,lat)
+    end
+
     def c_to_k(temperature); temperature + KELVIN; end
 
-    # Remember, temps in kelvin!
+    # Temps are in C
     def lwu(min_temp,max_temp)
       avg = (min_temp+max_temp) / 2.0
       SFCEMISS * STEFAN * (273.15+avg) ** 4
@@ -65,10 +70,40 @@ module AgwxBiophys
       if ( avg_v_press > 0.5)
         0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) );
       else
-        (1 - 0.261 * Math.exp(-0.000777 * avg * avg))
+        (1 - 0.261*Math.exp(-0.000777*avg_temp*avg_temp))
       end
     end
-    
+
+    # FIXME: Tests for following methods
+
+    def angstrom(avg_v_press,min_temp,max_temp)
+      sky_emiss(avg_v_press,min_temp,max_temp) / SFCEMISS
+    end
+
+    def clr_ratio(d_to_sol,doy,lat)
+      dts = daily_to_sol(d_to_sol)
+      tc = to_clr(doy,lat)
+      if dts < tc
+        dts / tc
+      else
+        1.0
+      end
+    end
+        
+    def et(max_temp,min_temp,avg_v_press,d_to_sol,doy,lat)
+      lwnet = angstrom(avg_v_press,min_temp,max_temp) * lwu(min_temp,max_temp)  * clr_ratio(d_to_sol,doy,lat)
+      lwd = lwu(min_temp,max_temp) - lwnet
+      r_net_1 = (1 - ALBEDO) * daily_to_sol(d_to_sol) - lwnet
+      ret1 = 1.28 * s_factor(min_temp,max_temp) * r_net_1
+      [ret1 / 62.3,clr_ratio(d_to_sol,doy,lat) * 100.0]
+    end
+#     double LWD = LWU - LWnet;
+#     double Rnet1 = ( 1-ALBEDO ) * DailyToSol - LWnet; /*  ;(RESULTANT ET)=MJ/M2/DY
+#                                                ;(RESULTANT ET)=REFN ET IN/DY */
+#     double RET1 = 1.28 * Sfactor * Rnet1;
+#     DRefET = RET1 / 62.3;
+#     DClrRatio = ClrRatio*100;
+
     # Here's the old Java code
     # double rad_lat =       lat *Math.PI/180.0;
     # double DailyToSol =    0.0864 * DToSol;
@@ -90,7 +125,24 @@ module AgwxBiophys
     #                          EMITTED OUT */
     # double Sfactor = 0.398 + 0.0171 * T - 0.000142 * T * T;
     # 
-    
+    # double Angstrom = 1 - SkyEmiss / SFCEMISS;
+# 
+#     double ClrRatio;
+#     if (DailyToSol <= ToClr) {          /*CLRRATIO = PCTCLR, < 100%
+#                                               100 added to relieve problem */
+#         ClrRatio =  DailyToSol / ToClr;
+#     }
+#     else {
+#         ClrRatio = 1.0;
+#     }
+# 
+#     double LWnet = Angstrom * LWU  * ClrRatio;
+#     double LWD = LWU - LWnet;
+#     double Rnet1 = ( 1-ALBEDO ) * DailyToSol - LWnet; /*  ;(RESULTANT ET)=MJ/M2/DY
+#                                                ;(RESULTANT ET)=REFN ET IN/DY */
+#     double RET1 = 1.28 * Sfactor * Rnet1;
+#     DRefET = RET1 / 62.3;
+#     DClrRatio = ClrRatio*100;
     
   end
 end
