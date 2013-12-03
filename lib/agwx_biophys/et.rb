@@ -49,12 +49,13 @@ module AgwxBiophys
     
     # FIXME: Write test
     def to_clr(doy,lat)
-      to_eir(doy,lat) * (-.7 + 0.86*day_hours(doy,lat)) / day_hours(doy,lat)
+      to_eir(doy,lat) * (-0.7 + 0.86*day_hours(doy,lat)) / day_hours(doy,lat)
     end
 
     def c_to_k(temperature); temperature + KELVIN; end
 
-    # Temps are in C
+    # Temps are in Deg C
+    
     def lwu(min_temp,max_temp)
       avg = (min_temp+max_temp) / 2.0
       SFCEMISS * STEFAN * (273.15+avg) ** 4
@@ -68,7 +69,7 @@ module AgwxBiophys
     def sky_emiss(avg_v_press,min_temp,max_temp)
       avg_temp = (min_temp+max_temp) / 2.0
       if ( avg_v_press > 0.5)
-        0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) );
+        0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) )
       else
         (1 - 0.261*Math.exp(-0.000777*avg_temp*avg_temp))
       end
@@ -144,5 +145,5 @@ module AgwxBiophys
 #     DRefET = RET1 / 62.3;
 #     DClrRatio = ClrRatio*100;
     
-  end
-end
+  end # module ET
+end # AgwxBiophys

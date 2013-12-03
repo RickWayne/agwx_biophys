@@ -96,9 +96,9 @@ class TestET < Test::Unit::TestCase
   
   def test_lwu
     [
-      [273.15,293.15,450.406110886],
-      [268.15,308.15,466.818655323],
-      [293.15,313.15,518.7552592804]
+      [5,15,30.2297320891],
+      [15,24,34.4954764843],
+      [18,27,35.9318491504]
     ].each do |min,max,exp_lwu|
       assert_in_delta(exp_lwu, lwu(min,max), 2 ** -20)
     end
@@ -106,12 +106,44 @@ class TestET < Test::Unit::TestCase
   
   def test_sfactor
     [
-      [273.15,293.15,-6.144831995],
-      [268.15,308.15,-6.464954995],
-      [293.15,313.15,-7.467923995]
+      [5,15,0.5548],
+      [16,24,0.6832],
+      [18,27,0.7108625]
     ].each do |min,max,exp_sfactor|
       assert_in_delta(exp_sfactor, sfactor(min,max), 2 ** -20)
     end
+  end
+  
+  def test_exponentiation
+    assert_in_delta(2.71828182845904, Math.exp(1), 2 ** -20)
+    assert_in_delta(148.4131591026, Math.exp(5), 2 ** -20)
+    [
+      [5 ,15,10  ,283.0, 0.9252419575,200.4076128756],
+      [16,24,20  ,293.0, 0.7328604333,167.2440168899],
+      [18,27,22.5,295.5, 0.6747883114,160.1550057145]
+    ].each do |min,max,avg,avg_kelvin,lo,hi|
+      avg_temp = (min+max) / 2.0
+      assert_in_delta(avg, avg_temp, 2 ** -20)
+      assert_in_delta(avg_temp + 273.0, avg_kelvin, 2 ** -20)
+      avg_kelvin = avg_temp + 273
+      lo_exp = Math.exp(-0.000777*avg_temp*avg_temp)
+      hi_exp = Math.exp( 1500.0/(273.0+avg_temp))
+      assert_in_delta(hi, hi_exp, 2 ** -20)
+      assert_in_delta(lo, lo_exp, 2 ** -20)
+    end
+  end
+  
+  def test_sky_emiss
+    [
+      [0.1,5,15    ,0.7585118491],
+      [0.2,16,24   ,0.8087234269],
+      [0.499,18,27 ,0.8238802507],
+      [0.51,5,15   ,0.7608136901],
+      [1,16,24     ,0.79951019],
+      [2,18,27     ,0.8905844568]
+    ].each do |vp,min,max,sky|
+      assert_in_delta(sky, sky_emiss(vp,min,max), 0.01,"Out of range for vp #{vp} min #{min} max #{max}")
+    end  
   end
     
 end
