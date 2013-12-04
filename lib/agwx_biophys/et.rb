@@ -47,7 +47,6 @@ module AgwxBiophys
       )
     end
     
-    # FIXME: Write test
     def to_clr(doy,lat)
       to_eir(doy,lat) * (-0.7 + 0.86*day_hours(doy,lat)) / day_hours(doy,lat)
     end
@@ -66,36 +65,37 @@ module AgwxBiophys
       0.398 + 0.0171 * avg - 0.000142 * avg * avg
     end
     
-    def sky_emiss(avg_v_press,min_temp,max_temp)
-      avg_temp = (min_temp+max_temp) / 2.0
+    def sky_emiss(avg_v_press,min_temp,max_temp,avg_temp)
+
       if ( avg_v_press > 0.5)
         0.7 + (5.95e-4) * avg_v_press * Math.exp( 1500/(273+avg_temp) )
       else
-        (1 - 0.261*Math.exp(-0.000777*avg_temp*avg_temp))
+        avg_t = (min_temp+max_temp) / 2.0
+        (1 - 0.261*Math.exp(-0.000777*avg_t*avg_t))
       end
     end
 
-    # FIXME: Tests for following methods
-
-    def angstrom(avg_v_press,min_temp,max_temp)
-      sky_emiss(avg_v_press,min_temp,max_temp) / SFCEMISS
+    def angstrom(avg_v_press,min_temp,max_temp,avg_temp)
+      1.0 - sky_emiss(avg_v_press,min_temp,max_temp,avg_temp) / SFCEMISS
     end
 
     def clr_ratio(d_to_sol,doy,lat)
       dts = daily_to_sol(d_to_sol)
       tc = to_clr(doy,lat)
-      if dts < tc
-        dts / tc
-      else
-        1.0
-      end
+      # Never return higher than 1
+      [dts/tc,1.0].min
     end
-        
-    def et(max_temp,min_temp,avg_v_press,d_to_sol,doy,lat)
-      lwnet = angstrom(avg_v_press,min_temp,max_temp) * lwu(min_temp,max_temp)  * clr_ratio(d_to_sol,doy,lat)
+    
+    def lwnet(avg_v_press,min_temp,max_temp,avg_temp,d_to_sol,doy,lat)
+      angstrom(avg_v_press,min_temp,max_temp,avg_temp) * lwu(min_temp,max_temp)  * clr_ratio(d_to_sol,doy,lat)
+    end
+    
+    def et(max_temp,min_temp,avg_temp,avg_v_press,d_to_sol,doy,lat)
+      lwnet = lwnet(avg_v_press,min_temp,max_temp,avg_temp,d_to_sol,doy,lat  )
       lwd = lwu(min_temp,max_temp) - lwnet
-      r_net_1 = (1 - ALBEDO) * daily_to_sol(d_to_sol) - lwnet
-      ret1 = 1.28 * s_factor(min_temp,max_temp) * r_net_1
+      r_net_1 = (1.0 - ALBEDO) * daily_to_sol(d_to_sol) - lwnet
+      ret1 = 1.28 * sfactor(min_temp,max_temp) * r_net_1
+      # puts "lwnet #{lwnet}, lwd #{lwd}, r_net_1 #{r_net_1}, ret1 #{ret1} refet #{ret1 / 62.3}"
       [ret1 / 62.3,clr_ratio(d_to_sol,doy,lat) * 100.0]
     end
 #     double LWD = LWU - LWnet;
