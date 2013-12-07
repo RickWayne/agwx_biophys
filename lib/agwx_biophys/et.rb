@@ -1,4 +1,9 @@
 module AgwxBiophys
+  module DegreeDay
+    def rect_dd
+      
+    end
+  end  
   module ET
     SOLCON    = 1367.0
     STEFAN    = (0.0864*0.0000000567)
