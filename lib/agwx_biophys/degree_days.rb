@@ -10,31 +10,34 @@ module AgwxBiophys
       arr
     end
 
-    # Calculate rect DD from min and max for this day. Everything is in Celsius.
-    def rect_DD(min,max,base=10,upper=30)
-      max = [upper,max].min
-      min = [upper,min].min
+    # Degree-day calcs taken from prg/src/tisdat/calccumdd.c
+    
+    # Calculate rect DD from min and max for this day. Everything is in Fahrenheit.
+    def rect_DD(min,max,base=50)
       rect = ((max + min) / 2.0) - base
       # Never return a negative number
+      # puts "rect_dd for #{min},#{max},#{base},#{upper} returning #{rect}"
       rect >= 0.0 ? rect : 0.0
     end
 
-    def rect_DD_from_avg(avg,base=10,upper=30)
-      avg = [upper,avg].min
+    def rect_DD_from_avg(avg,base=50)
       rect = avg - base
       rect >= 0.0 ? rect : 0.0
     end
 
-    def modB_DD(min,max,base=10,upper=30)
+    def modB_DD(min,max,base=50,upper=86)
       min = [base,min].max
       max = [base,max].max
-      rect_DD(min,max,base,upper)
+      
+      min = [min,upper].min
+      max = [max,upper].min
+      rect_DD(min,max,base)
     end
 
-    DD_MAX_TEMP = 30
-    M_1_PI =	0.31830988618379067154
+    DD_MAX_TEMP = 86
+    M_1_PI =  0.31830988618379067154
     
-    def sine_DD(min,max,base=10)
+    def sine_DD(min,max,base=50,upper=DD_MAX_TEMP)
       alpha = nil
       o1 = o2 = nil
       dd = nil
@@ -46,29 +49,47 @@ module AgwxBiophys
         #           if (TMin > TMax) {
         # RegErr("CalcDayDD:SineDD:","","Tmin > Tmax");
         # return -9999999;
-      return DD_MAX_TEMP - base if (min >= DD_MAX_TEMP)
+      return upper - base if (min >= upper)
       return 0 if (max <= base)
-      return avg - base if (max <= DD_MAX_TEMP && min >= base)
+      return avg - base if (max <= upper && min >= base)
 
       alpha = (max-min)/2;
-      if (max <= DD_MAX_TEMP && min < base)
+      if (max <= upper && min < base)
         o1    = Math.asin( (base-avg)/alpha)
-      	return M_1_PI*( (avg-base) * (Math::PI / 2-o1) + alpha*cos(o1) )
+        return M_1_PI*( (avg-base) * (Math::PI / 2-o1) + alpha*Math.cos(o1) )
       end
       
-      if (max >  DD_MAX_TEMP && min >= base)
-        o2    = asin( (DD_MAX_TEMP-avg)/alpha);
-      	return M_1_PI*( (avg-base) * (o2+M_1_PI) +
-      		(DD_MAX_TEMP-base) * (Math::PI / 2-o2) - alpha*cos(o2) )
+      if (max >  upper && min >= base)
+        o2    = Math.asin( (upper-avg)/alpha);
+        return M_1_PI*( (avg-base) * (o2+M_1_PI) +
+          (upper-base) * (Math::PI / 2-o2) - alpha*Math.cos(o2) )
       end
       
-      if (max >  DD_MAX_TEMP && min < base)
-        o1    = asin( (base-avg)/alpha);
-        o2    = asin( (DD_MAX_TEMP-avg)/alpha);
-      	return M_1_PI*( (avg-base)*(o2-o1) + alpha*(cos(o1)-cos(o2))
-      			+ (DD_MAX_TEMP-base)*(Math::PI / 2-o2) )
+      if (max >  upper && min < base)
+        o1    = Math.asin( (base-avg)/alpha);
+        o2    = Math.asin( (upper-avg)/alpha);
+        return M_1_PI*( (avg-base)*(o2-o1) + alpha*(Math.cos(o1)-Math.cos(o2))
+            + (upper-base)*(Math::PI / 2-o2) )
       end
     end
+    
+
+    def cumulate(min_temp_hash,max_temp_hash,start_doy,end_doy,base,upper=86)
+      prev = 0
+      days_found = 0
+      cumulation = (start_doy..end_doy).inject(0) do |sum,doy|
+        # Need a better interpolation algorithm here!
+        if min_temp_hash[doy] && max_temp_hash[doy]
+          days_found += 1
+          prev = yield(min_temp_hash[doy],max_temp_hash[doy],base,upper)
+        else
+          raise "doy #{doy} not found!"
+        end
+        sum + prev
+      end
+      [cumulation,days_found]
+    end
+    
     
     def to_fahrenheit(celsius)
       (celsius * (9.0 / 5.0)) + 32.0
@@ -187,43 +208,43 @@ module AgwxBiophys
       # puts ""
       averages
     end
-
-    def cumulate(min_grids,max_grids,averages,start_year=START_YEAR,end_year=END_YEAR,base=10.0,upper=30.0,fahrenheit=false)
-      # construct a set of DD arrays, one per year
-      yearly_DD_accums = {}
-      # print "cumulating. "
-      for year in start_year..end_year
-        yearly_DD_accums[year] = cumulate_array
-        # print "#{year}.."; $stdout.flush 
-        for doy in (START_DOY..END_DOY)
-          for lati_index in (0..MAX_Y_INDEX)
-            for longi_index in (0..MAX_X_INDEX)
-              begin
-                min = min_grids[year].get_by_index(longi_index,lati_index,doy) || averages[doy][lati_index][longi_index]
-                max = max_grids[year].get_by_index(longi_index,lati_index,doy) || averages[doy][lati_index][longi_index]
-                if fahrenheit
-                  min = to_fahrenheit(min)
-                  max = to_fahrenheit(max)
-                  base = to_fahrenheit(base) if base == 10.0
-                  upper = to_fahrenheit(upper) if upper == 30.0
-                end
-                if block_given?
-                  dd = yield(min,max,base,upper)
-                else
-                  dd = rect_DD(min,max,base,upper)
-                end
-                yearly_DD_accums[year][lati_index][longi_index] += dd
-              rescue Exception => e
-                puts "cumulate: problem at #{year}, #{doy}, #{lati_index}, #{longi_index}"
-                raise e
-              end
-            end
-          end
-        end
-      end
-      # puts ""
-      yearly_DD_accums
-    end
+    
+    # def cumulate(min_grids,max_grids,averages,start_year=START_YEAR,end_year=END_YEAR,base=10.0,upper=30.0,fahrenheit=false)
+    #   # construct a set of DD arrays, one per year
+    #   yearly_DD_accums = {}
+    #   # print "cumulating. "
+    #   for year in start_year..end_year
+    #     yearly_DD_accums[year] = cumulate_array
+    #     # print "#{year}.."; $stdout.flush 
+    #     for doy in (START_DOY..END_DOY)
+    #       for lati_index in (0..MAX_Y_INDEX)
+    #         for longi_index in (0..MAX_X_INDEX)
+    #           begin
+    #             min = min_grids[year].get_by_index(longi_index,lati_index,doy) || averages[doy][lati_index][longi_index]
+    #             max = max_grids[year].get_by_index(longi_index,lati_index,doy) || averages[doy][lati_index][longi_index]
+    #             if fahrenheit
+    #               min = to_fahrenheit(min)
+    #               max = to_fahrenheit(max)
+    #               base = to_fahrenheit(base) if base == 10.0
+    #               upper = to_fahrenheit(upper) if upper == 30.0
+    #             end
+    #             if block_given?
+    #               dd = yield(min,max,base,upper)
+    #             else
+    #               dd = rect_DD(min,max,base,upper)
+    #             end
+    #             yearly_DD_accums[year][lati_index][longi_index] += dd
+    #           rescue Exception => e
+    #             puts "cumulate: problem at #{year}, #{doy}, #{lati_index}, #{longi_index}"
+    #             raise e
+    #           end
+    #         end
+    #       end
+    #     end
+    #   end
+    #   # puts ""
+    #   yearly_DD_accums
+    # end
 
     def year_dd_grid(max_grids,min_grids,year)
       return {1 => 4, 6 => 5}
