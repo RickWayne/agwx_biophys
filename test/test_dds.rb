@@ -20,6 +20,15 @@ class TestAgwxBiophys < Test::Unit::TestCase
     assert(sine_DD(10,20), "Could not even call sine_DD")
   end
   
+  def test_sine_is_less_than_ModB
+    [[10,25],[20,35],[40,60],[41,60],[42,60],[45,60],[50,86],[50,90],[51,90],[55,90],[60,90]].each do |(lower,upper)|
+      sine = sine_DD(lower,upper)
+      modB = modB_DD(lower,upper)
+      diff =  modB - sine
+      assert(diff >= 0) if (modB > 0 || sine > 0)
+    end
+  end
+  
   def get_temps_for(longitude = -95.6, latitude = 43.90)
     max_grid = Grid.new(File.join(File.dirname(__FILE__),'grids','WIMNTMax2012'),Grid::DAILY)
     min_grid = Grid.new(File.join(File.dirname(__FILE__),'grids','WIMNTMin2012'),Grid::DAILY)
